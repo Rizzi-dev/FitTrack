@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert, ScrollView } from 'react-native';
-import { Picker } from '@react-native-picker/picker'; // Atualização aqui
+import { Image, View, Text, TextInput, Button, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import gyms from '@/datas/gyms.json';
+import ParallaxScrollView from '@/components/ParallaxScrollView';
+import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '@/components/ThemedView';
 
 type UserType = 'Aluno' | 'Instrutor';
 
@@ -31,7 +34,7 @@ export default function UserRegistration() {
   const [cpf, setCpf] = useState<string>('');
   const [sex, setSex] = useState<string>('Masculino');
   const [userType, setUserType] = useState<UserType>('Aluno');
-  const [selectedGym, setSelectedGym] = useState<number | null>(null);
+  const [selectedGym, setSelectedGym] = useState<string>(''); // Alteração aqui
 
   const handleSubmit = () => {
     if (!name || !email || !cpf || !selectedGym) {
@@ -50,7 +53,7 @@ export default function UserRegistration() {
       cpf,
       sex,
       userType,
-      gym: gyms.find((gym) => gym.id === selectedGym)?.name,
+      gym: gyms.find((gym) => String(gym.id) === selectedGym)?.name, // Converte ID para string
     };
 
     console.log('Usuário cadastrado:', user);
@@ -58,6 +61,25 @@ export default function UserRegistration() {
   };
 
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+
+      <ParallaxScrollView
+        headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
+        headerImage={
+          <Image
+            source={require('@/assets/images/home_img.jpeg')}
+            style={styles.headerImage}
+          />
+        }
+      >
+
+    <ThemedView style={styles.titleContainer}>
+          <ThemedText type="title">Cadastro de Usuário</ThemedText>
+        </ThemedView>
+
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Cadastro de Usuário</Text>
 
@@ -89,7 +111,7 @@ export default function UserRegistration() {
         <Picker
           selectedValue={sex}
           style={styles.picker}
-          onValueChange={(itemValue) => setSex(itemValue as string)}
+          onValueChange={(itemValue) => setSex(itemValue)}
         >
           <Picker.Item label="Masculino" value="Masculino" />
           <Picker.Item label="Feminino" value="Feminino" />
@@ -113,29 +135,34 @@ export default function UserRegistration() {
         <Picker
           selectedValue={selectedGym}
           style={styles.picker}
-          onValueChange={(itemValue) => setSelectedGym(itemValue as number)}
+          onValueChange={(itemValue) => setSelectedGym(itemValue)}
         >
           {gyms.map((gym) => (
-            <Picker.Item key={gym.id} label={gym.name} value={gym.id} />
+            <Picker.Item key={gym.id} label={gym.name} value={String(gym.id)} /> // Converte ID para string
           ))}
         </Picker>
       </View>
 
       <Button title="Cadastrar" onPress={handleSubmit} />
     </ScrollView>
+    </ParallaxScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    padding: 16,
-    backgroundColor: '#f4f4f4',
+  headerImage: {
+    height: 500,
+    width: '100%',
+    position: 'absolute',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 16,
+  },
+  formContainer: {
+    padding: 16,
   },
   input: {
     height: 40,
@@ -146,14 +173,24 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: '#fff',
   },
-  row: {
-    marginBottom: 16,
-  },
   picker: {
     height: 40,
+    marginBottom: 16,
     backgroundColor: '#fff',
     borderColor: '#ccc',
     borderWidth: 1,
     borderRadius: 4,
   },
+  row: {
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  container: {
+    flex: 1,
+    padding: 16,
+  }
 });
