@@ -1,109 +1,159 @@
-import { StyleSheet, Image, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, Button, StyleSheet, Alert, ScrollView } from 'react-native';
+import { Picker } from '@react-native-picker/picker'; // Atualização aqui
+import gyms from '@/datas/gyms.json';
 
-import { Collapsible } from '@/components/Collapsible';
-import { ExternalLink } from '@/components/ExternalLink';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { IconSymbol } from '@/components/ui/IconSymbol';
+type UserType = 'Aluno' | 'Instrutor';
 
-export default function TabTwoScreen() {
+const isValidCPF = (cpf: string): boolean => {
+  cpf = cpf.replace(/[^\d]+/g, ''); // Remove caracteres não numéricos
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+
+  let sum = 0;
+  let remainder;
+  for (let i = 1; i <= 9; i++) sum += parseInt(cpf[i - 1]) * (11 - i);
+  remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cpf[9])) return false;
+
+  sum = 0;
+  for (let i = 1; i <= 10; i++) sum += parseInt(cpf[i - 1]) * (12 - i);
+  remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cpf[10])) return false;
+
+  return true;
+};
+
+export default function UserRegistration() {
+  const [name, setName] = useState<string>('');
+  const [email, setEmail] = useState<string>('');
+  const [cpf, setCpf] = useState<string>('');
+  const [sex, setSex] = useState<string>('Masculino');
+  const [userType, setUserType] = useState<UserType>('Aluno');
+  const [selectedGym, setSelectedGym] = useState<number | null>(null);
+
+  const handleSubmit = () => {
+    if (!name || !email || !cpf || !selectedGym) {
+      Alert.alert('Erro', 'Preencha todos os campos!');
+      return;
+    }
+
+    if (!isValidCPF(cpf)) {
+      Alert.alert('Erro', 'CPF inválido!');
+      return;
+    }
+
+    const user = {
+      name,
+      email,
+      cpf,
+      sex,
+      userType,
+      gym: gyms.find((gym) => gym.id === selectedGym)?.name,
+    };
+
+    console.log('Usuário cadastrado:', user);
+    Alert.alert('Sucesso', 'Cadastro realizado com sucesso!');
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image source={require('@/assets/images/react-logo.png')} style={{ alignSelf: 'center' }} />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Custom fonts">
-        <ThemedText>
-          Open <ThemedText type="defaultSemiBold">app/_layout.tsx</ThemedText> to see how to load{' '}
-          <ThemedText style={{ fontFamily: 'SpaceMono' }}>
-            custom fonts such as this one.
-          </ThemedText>
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/versions/latest/sdk/font">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user's current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful <ThemedText type="defaultSemiBold">react-native-reanimated</ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Cadastro de Usuário</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Nome"
+        value={name}
+        onChangeText={setName}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="E-mail"
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="CPF"
+        value={cpf}
+        onChangeText={setCpf}
+        keyboardType="numeric"
+      />
+
+      <View style={styles.row}>
+        <Text>Sexo:</Text>
+        <Picker
+          selectedValue={sex}
+          style={styles.picker}
+          onValueChange={(itemValue) => setSex(itemValue as string)}
+        >
+          <Picker.Item label="Masculino" value="Masculino" />
+          <Picker.Item label="Feminino" value="Feminino" />
+        </Picker>
+      </View>
+
+      <View style={styles.row}>
+        <Text>Tipo de Usuário:</Text>
+        <Picker
+          selectedValue={userType}
+          style={styles.picker}
+          onValueChange={(itemValue) => setUserType(itemValue as UserType)}
+        >
+          <Picker.Item label="Aluno" value="Aluno" />
+          <Picker.Item label="Instrutor" value="Instrutor" />
+        </Picker>
+      </View>
+
+      <View style={styles.row}>
+        <Text>Academia:</Text>
+        <Picker
+          selectedValue={selectedGym}
+          style={styles.picker}
+          onValueChange={(itemValue) => setSelectedGym(itemValue as number)}
+        >
+          {gyms.map((gym) => (
+            <Picker.Item key={gym.id} label={gym.name} value={gym.id} />
+          ))}
+        </Picker>
+      </View>
+
+      <Button title="Cadastrar" onPress={handleSubmit} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flexGrow: 1,
+    padding: 16,
+    backgroundColor: '#f4f4f4',
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  input: {
+    height: 40,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    marginBottom: 16,
+    backgroundColor: '#fff',
+  },
+  row: {
+    marginBottom: 16,
+  },
+  picker: {
+    height: 40,
+    backgroundColor: '#fff',
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 4,
   },
 });
