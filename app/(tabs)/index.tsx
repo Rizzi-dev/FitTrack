@@ -7,12 +7,7 @@ import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 
-import users from '@/datas/users.json';
-
-interface User {
-  username: string;
-  password: string;
-}
+import { authenticateUser } from '@/services/users';
 
 type RootStackParamList = {
   Home: undefined;
@@ -24,13 +19,6 @@ type HomeScreenNavigationProp = NativeStackNavigationProp<
   'Home'
 >;
 
-const authenticateUser = (username: string, password: string): boolean => {
-  const user = (users as User[]).find(
-    (user) => user.username === username && user.password === password
-  );
-  return !!user;
-};
-
 interface HomeScreenProps {
   navigation: HomeScreenNavigationProp;
 }
@@ -39,57 +27,66 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
 
-  const handleLogin = () => {
-    if (authenticateUser(username, password)) {
-      Alert.alert('Login bem-sucedido!', 'Bem-vindo ao FitTrack!');
-      navigation.navigate('MainDashboard');
-    } else {
-      Alert.alert('Erro', 'Usuário ou senha incorretos');
+  const handleLogin = async () => {
+    try {
+      const isAuthenticated = await authenticateUser(username, password);
+      if (isAuthenticated) {
+        Alert.alert('Login bem-sucedido!', 'Bem-vindo ao FitTrack!');
+        navigation.navigate('MainDashboard');
+      } else {
+        Alert.alert('Erro', 'Usuário ou senha incorretos');
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Erro', 'Houve um problema na autenticação. Tente novamente.');
     }
   };
 
   return (
     <KeyboardAvoidingView
-      style={{flex: 1}}
+      style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ParallaxScrollView
+        headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
+        headerImage={
+          <Image
+            source={require('@/assets/images/home_img.jpeg')}
+            style={styles.reactLogo}
+          />
+        }
       >
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/home_img.jpeg')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Bem-vindo ao FitTrack</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Alcance seus objetivos de forma inteligente e personalizada!</ThemedText>
-        <ThemedText>
-          Entre agora e transforme toda a sua rotina de treino com o FitTrack.
-        </ThemedText>
-      </ThemedView>
+        <ThemedView style={styles.titleContainer}>
+          <ThemedText type="title">Bem-vindo ao FitTrack</ThemedText>
+          <HelloWave />
+        </ThemedView>
+        <ThemedView style={styles.stepContainer}>
+          <ThemedText type="subtitle">
+            Alcance seus objetivos de forma inteligente e personalizada!
+          </ThemedText>
+          <ThemedText>
+            Entre agora e transforme toda a sua rotina de treino com o FitTrack.
+          </ThemedText>
+        </ThemedView>
 
-      <ThemedView style={styles.loginContainer}>
-        <ThemedText style={styles.stepContainer}>Faça seu login</ThemedText>
-        <TextInput
-          placeholder="Usuário"
-          value={username}
-          onChangeText={setUsername}
-          style={styles.input}
-        />
-        <TextInput
-          placeholder="Senha"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          style={styles.input}
-        />
-        <Button title="Entrar" onPress={handleLogin} />
-      </ThemedView>
-    </ParallaxScrollView>
+        <ThemedView style={styles.loginContainer}>
+          <ThemedText style={styles.stepContainer}>Faça seu login</ThemedText>
+          <TextInput
+            placeholder="Usuário"
+            value={username}
+            onChangeText={setUsername}
+            style={styles.input}
+          />
+          <TextInput
+            placeholder="Senha"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            style={styles.input}
+          />
+          <Button title="Entrar" onPress={handleLogin} />
+        </ThemedView>
+      </ParallaxScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -103,7 +100,6 @@ const styles = StyleSheet.create({
   stepContainer: {
     gap: 8,
     marginBottom: 15,
-
   },
   reactLogo: {
     height: 500,
