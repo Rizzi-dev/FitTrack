@@ -1,0 +1,41 @@
+[
+    {
+      "segunda": {
+        "treino": "Peito e Bíceps",
+        "exercicios": [
+          { "maquina": "Supino Reto", "series": "4x10" },
+          { "maquina": "Crossover", "series": "3x12" },
+          { "maquina": "Rosca Direta", "series": "4x10" }
+        ]
+      },
+      "terça": {
+        "treino": "Costas e Tríceps",
+        "exercicios": [
+          { "maquina": "Barra Fixa", "series": "4x8" },
+          { "maquina": "Pulldown", "series": "3x10" },
+          { "maquina": "Tríceps Testa", "series": "4x10" }
+        ]
+      },
+      "quarta": {
+        "treino": "Descanso",
+        "exercicios": []
+      },
+      "quinta": {
+        "treino": "Pernas",
+        "exercicios": [
+          { "maquina": "Leg Press", "series": "4x10" },
+          { "maquina": "Cadeira Extensora", "series": "4x12" },
+          { "maquina": "Agachamento Livre", "series": "4x10" }
+        ]
+      },
+      "sexta": {
+        "treino": "Ombros e Abdômen",
+        "exercicios": [
+          { "maquina": "Desenvolvimento com Halteres", "series": "4x12" },
+          { "maquina": "Elevação Lateral", "series": "4x10" },
+          { "maquina": "Abdominal Supra", "series": "4x20" }
+        ]
+      }
+    }
+  ]
+  

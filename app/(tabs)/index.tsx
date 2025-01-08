@@ -7,11 +7,17 @@ import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 
-import { authenticateUser } from '@/services/users';
+// JSON estático para simular autenticação
+const users = [
+  { username: 'aluno', password: '1234', type: 'aluno' },
+  { username: 'instrutor', password: '5678', type: 'instrutor' },
+];
 
 type RootStackParamList = {
   Home: undefined;
   MainDashboard: undefined;
+  DashAluno: undefined;
+  DashInstrutor: undefined;
 };
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
@@ -27,18 +33,33 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
 
-  const handleLogin = async () => {
-    try {
-      const isAuthenticated = await authenticateUser(username, password);
-      if (isAuthenticated) {
-        Alert.alert('Login bem-sucedido!', 'Bem-vindo ao FitTrack!');
-        navigation.navigate('MainDashboard');
-      } else {
-        Alert.alert('Erro', 'Usuário ou senha incorretos');
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert('Erro', 'Houve um problema na autenticação. Tente novamente.');
+  // Função para simular autenticação com o JSON estático
+  const authenticateUser = (username: string, password: string) => {
+    const user = users.find(
+      (u) => u.username === username && u.password === password
+    );
+    return user || null;
+  };
+
+  // Função para redirecionar para o dashboard correto
+  const redirectToDashboard = (userType: string) => {
+    if (userType === 'aluno') {
+      navigation.navigate('dashAluno');
+    } else if (userType === 'instrutor') {
+      navigation.navigate('dashInstrutor');
+    } else {
+      Alert.alert('Erro', 'Tipo de usuário desconhecido');
+    }
+  };
+
+  const handleLogin = () => {
+    // Validação usando JSON estático
+    const user = authenticateUser(username, password);
+    if (user) {
+      Alert.alert('Login bem-sucedido!', `Bem-vindo, ${user.username}!`);
+      redirectToDashboard(user.type); // Redireciona com base no tipo de usuário
+    } else {
+      Alert.alert('Erro', 'Usuário ou senha incorretos');
     }
   };
 
