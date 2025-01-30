@@ -71,7 +71,7 @@ export default function UserRegistration() {
         headerImage={
           <Image
             source={require('@/assets/images/home_img.jpeg')}
-            style={styles.headerImage}
+            style={styles.topImage}
           />
         }
       >
@@ -106,42 +106,40 @@ export default function UserRegistration() {
         keyboardType="numeric"
       />
 
-      <View style={styles.row}>
-        <Text>Sexo:</Text>
-        <Picker
-          selectedValue={sex}
-          style={styles.picker}
-          onValueChange={(itemValue) => setSex(itemValue)}
-        >
-          <Picker.Item label="Masculino" value="Masculino" />
-          <Picker.Item label="Feminino" value="Feminino" />
-        </Picker>
-      </View>
+<View style={styles.pickerContainer}>
+  <Picker
+    selectedValue={sex}
+    style={styles.picker}
+    onValueChange={(itemValue) => setSex(itemValue)}
+  >
+    <Picker.Item label="Masculino" value="Masculino" />
+    <Picker.Item label="Feminino" value="Feminino" />
+  </Picker>
+</View>
 
-      <View style={styles.row}>
-        <Text>Tipo de Usuário:</Text>
-        <Picker
-          selectedValue={userType}
-          style={styles.picker}
-          onValueChange={(itemValue) => setUserType(itemValue as UserType)}
-        >
-          <Picker.Item label="Aluno" value="Aluno" />
-          <Picker.Item label="Instrutor" value="Instrutor" />
-        </Picker>
-      </View>
+<View style={styles.pickerContainer}>
+  <Picker
+    selectedValue={userType}
+    style={styles.picker}
+    onValueChange={(itemValue) => setUserType(itemValue as UserType)}
+  >
+    <Picker.Item label="Aluno" value="Aluno" />
+    <Picker.Item label="Instrutor" value="Instrutor" />
+  </Picker>
+</View>
 
-      <View style={styles.row}>
-        <Text>Academia:</Text>
-        <Picker
-          selectedValue={selectedGym}
-          style={styles.picker}
-          onValueChange={(itemValue) => setSelectedGym(itemValue)}
-        >
-          {gyms.map((gym) => (
-            <Picker.Item key={gym.id} label={gym.name} value={String(gym.id)} /> // Converte ID para string
-          ))}
-        </Picker>
-      </View>
+<View style={styles.pickerContainer}>
+  <Picker
+    selectedValue={selectedGym}
+    style={styles.picker}
+    onValueChange={(itemValue) => setSelectedGym(itemValue)}
+  >
+    {gyms.map((gym) => (
+      <Picker.Item key={gym.id} label={gym.name} value={String(gym.id)} />
+    ))}
+  </Picker>
+</View>
+
 
       <Button title="Cadastrar" onPress={handleSubmit} />
     </ScrollView>
@@ -151,6 +149,14 @@ export default function UserRegistration() {
 }
 
 const styles = StyleSheet.create({
+  topImage: {
+    height: 500,
+    width: 500,
+    bottom: 0,
+    top: 0,
+    left: 0,
+    position: 'absolute',
+  },
   headerImage: {
     height: 500,
     width: '100%',
@@ -175,11 +181,20 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 40,
-    marginBottom: 16,
+    width: '100%', // Garantir que o picker ocupe o espaço necessário
     backgroundColor: '#fff',
     borderColor: '#ccc',
     borderWidth: 1,
     borderRadius: 4,
+    color: '#000', // Cor do texto dentro do picker
+  },
+  pickerContainer: {
+    marginBottom: 16, // Espaçamento entre os pickers
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    backgroundColor: '#fff',
+    overflow: 'hidden', // Para evitar que o conteúdo ultrapasse as bordas
   },
   row: {
     marginBottom: 16,
@@ -192,5 +207,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-  }
+  },
 });
+

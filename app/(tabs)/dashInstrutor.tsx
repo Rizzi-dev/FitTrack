@@ -35,22 +35,22 @@ const DashboardInstrutor = () => {
 
         <TouchableOpacity style={styles.button}>
           <Ionicons name="pencil-outline" size={24} color="white" />
-          <Text style={styles.buttonText}>Personalizar Treino</Text>
+          <Text style={styles.buttonText}>Modificar treinos de alunos</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.button}>
           <Ionicons name="person-outline" size={24} color="white" />
-          <Text style={styles.buttonText}>Chamar Instrutor</Text>
+          <Text style={styles.buttonText}>Listar Alunos</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.button}>
           <Ionicons name="list-outline" size={24} color="white" />
-          <Text style={styles.buttonText}>Ver Outros Treinos</Text>
+          <Text style={styles.buttonText}>Visualizar notificações</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.lastButton}>
           <Ionicons name="id-card-outline" size={24} color="white" />
-          <Text style={styles.buttonText}>Gostaria de treinar do seu jeito?</Text>
+          <Text style={styles.buttonText}>Ver Perfil</Text>
         </TouchableOpacity>
       </View>
     </View>

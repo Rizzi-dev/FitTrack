@@ -17,8 +17,12 @@
         ]
       },
       "quarta": {
-        "treino": "Descanso",
-        "exercicios": []
+       "treino": "Costas e Tríceps",
+        "exercicios": [
+          { "maquina": "Barra Fixa", "series": "4x8" },
+          { "maquina": "Pulldown", "series": "3x10" },
+          { "maquina": "Tríceps Testa", "series": "4x10" }
+        ]
       },
       "quinta": {
         "treino": "Pernas",
