@@ -1,36 +1,81 @@
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  TextInput,
-  FlatList,
-} from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Modal, FlatList, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import workouts from "@/datas/workouts.json";
-import gyms from "@/datas/gyms.json"; // Adicione este arquivo
+import gyms from "@/datas/gyms.json";
+import PersonalizarTreinoModal from "@/components/PersonalizarTreinoModal";
 import TreineSeuJeitoModal from "@/components/TreineSeuJeitoModal";
 
 const DashboardAluno = () => {
-  const [dayName] = useState(
-    new Date().toLocaleDateString("pt-BR", { weekday: "long" }).toLowerCase()
-  );
+  const [dayName, setDayName] = useState("");
   const [todayWorkout, setTodayWorkout] = useState(null);
   const [selectedGym, setSelectedGym] = useState("Fit Center");
-  const [isGymModalVisible, setGymModalVisible] = useState(false);
   const [isWorkoutModalVisible, setWorkoutModalVisible] = useState(false);
-  const [isCustomWorkoutModalVisible, setCustomWorkoutModalVisible] =
-    useState(false);
-  const [customWorkout, setCustomWorkout] = useState("");
-  const [isModalVisible, setModalVisible] = useState(false);
-
+  const [isGymModalVisible, setGymModalVisible] = useState(false);
+  const [isOtherWorkoutsModalVisible, setOtherWorkoutsModalVisible] = useState(false);
+  const [isTreineSeuJeitoModalVisible, setTreineSeuJeitoModalVisible] = useState(false);
 
   useEffect(() => {
-    const workoutPlan = workouts[dayName as keyof typeof workouts];
-    setTodayWorkout(workoutPlan);
-  }, [dayName]);
+    const today = new Date();
+    const dayName = today.toLocaleDateString("pt-BR", { weekday: "long" }).toLowerCase();
+    setDayName(dayName);
+    updateTodayWorkout(dayName);
+  }, []);
+
+  const updateTodayWorkout = (day) => {
+    const workoutPlan = workouts[day];
+    if (workoutPlan) {
+      setTodayWorkout(workoutPlan);
+    } else {
+      setTodayWorkout({ treino: "Descanso", exercicios: [] });
+    }
+  };
+
+   const shareWorkout = async () => {
+     if (!todayWorkout) {
+       Alert.alert("Erro", "Não há treino disponível para compartilhar.");
+       return;
+     }
+
+     const workoutString = JSON.stringify(todayWorkout, null, 2);
+     const fileName = `treino_${dayName}.json`;
+     const filePath = `${FileSystem.cacheDirectory}${fileName}`;
+
+     try {
+       await FileSystem.writeAsStringAsync(filePath, workoutString);
+
+       if (await Sharing.isAvailableAsync()) {
+         await Sharing.shareAsync(filePath, {
+           mimeType: 'application/json',
+           dialogTitle: 'Salvar treino',
+           UTI: 'public.json' // Isso é necessário para iOS
+         });
+         Alert.alert("Sucesso", "Arquivo de treino compartilhado com sucesso!");
+       } else {
+         Alert.alert("Erro", "Compartilhamento não está disponível neste dispositivo.");
+       }
+     } catch (error) {
+       console.error("Erro ao compartilhar o treino:", error);
+       Alert.alert("Erro", "Não foi possível compartilhar o arquivo de treino.");
+     } finally {
+       // Limpar o arquivo temporário
+       await FileSystem.deleteAsync(filePath, { idempotent: true });
+     }
+   };
+
+   const renderWorkoutItem = ({ item: [day, workout] }) => (
+       <View style={styles.workoutItem}>
+         <Text style={styles.workoutDay}>{day.charAt(0).toUpperCase() + day.slice(1)}</Text>
+         <Text style={styles.workoutName}>{workout.treino}</Text>
+         {workout.exercicios.map((exercicio, index) => (
+           <Text key={index} style={styles.workoutExercise}>
+             - {exercicio.maquina}: {exercicio.series}
+           </Text>
+         ))}
+       </View>
+     );
 
   return (
     <View style={styles.container}>
@@ -70,117 +115,115 @@ const DashboardAluno = () => {
         </TouchableOpacity>
 
         {/* Chamar Instrutor */}
-        <TouchableOpacity style={styles.button}>
+        <TouchableOpacity style={styles.button} onPress={() => console.log("Chamar Instrutor")}>
           <Ionicons name="person-outline" size={24} color="white" />
           <Text style={styles.buttonText}>Chamar Instrutor</Text>
         </TouchableOpacity>
 
         {/* Ver Outros Treinos */}
-        <TouchableOpacity style={styles.button}>
+        <TouchableOpacity style={styles.button} onPress={() => setOtherWorkoutsModalVisible(true)}>
           <Ionicons name="list-outline" size={24} color="white" />
           <Text style={styles.buttonText}>Ver Outros Treinos</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.lastButton}
-                  onPress={() => setModalVisible(true)}><TreineSeuJeitoModal
-                  visible={isModalVisible}
-                  onClose={() => setModalVisible(false)}
-                  onSubmit={(data) => {
-                    console.log("Texto:", data.text);
-                    console.log("Imagem URI:", data.image);
-                  }}
-                />
-          <Ionicons name="id-card-outline" size={24} color="white" />
-          <Text style={styles.buttonText}>Gostaria de treinar do seu jeito?</Text>
+        {/* Botão de Download */}
+        <TouchableOpacity style={styles.button} onPress={shareWorkout}>
+          <Ionicons name="download-outline" size={24} color="white" />
+          <Text style={styles.buttonText}>Fazer download deste treino</Text>
         </TouchableOpacity>
+
+          <TouchableOpacity
+                  style={styles.button}
+                  onPress={() => setTreineSeuJeitoModalVisible(true)}
+                >
+                  <Ionicons name="create-outline" size={24} color="white" />
+                  <Text style={styles.buttonText}>Gostaria de treinar do seu jeito?</Text>
+          </TouchableOpacity>
+
       </View>
 
       {/* Modal para Mudar Academia */}
-      <Modal visible={isGymModalVisible} transparent animationType="slide">
-        <View style={styles.modal}>
-          <Text style={styles.modalTitle}>Escolha sua Academia</Text>
-          <FlatList
-            data={gyms}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={() => {
-                  setSelectedGym(item.name);
-                  setGymModalVisible(false);
-                }}
-              >
-                <Text style={styles.modalText}>{item.name}</Text>
-              </TouchableOpacity>
-            )}
-          />
-          <TouchableOpacity
-            style={styles.modalClose}
-            onPress={() => setGymModalVisible(false)}
-          >
-            <Text style={styles.modalCloseText}>Fechar</Text>
-          </TouchableOpacity>
+      <Modal
+        visible={isGymModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setGymModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Escolha sua Academia</Text>
+            <FlatList
+              data={gyms}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.modalOption}
+                  onPress={() => {
+                    setSelectedGym(item.name);
+                    setGymModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.modalOptionText}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setGymModalVisible(false)}
+            >
+              <Text style={styles.buttonText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
 
       {/* Modal para Personalizar Treino */}
-      <Modal visible={isWorkoutModalVisible} transparent animationType="slide">
-        <View style={styles.modal}>
-          <Text style={styles.modalTitle}>Personalize seu Treino</Text>
-          {todayWorkout?.exercicios.map((exercicio, index) => (
-            <View key={index} style={styles.modalOption}>
-              <TextInput
-                style={styles.input}
-                defaultValue={`${exercicio.series}`}
-                onChangeText={(text) => {
-                  const updatedWorkout = { ...todayWorkout };
-                  updatedWorkout.exercicios[index].series = text;
-                  setTodayWorkout(updatedWorkout);
-                }} 
-              />
-            </View>
-          ))}
-          <TouchableOpacity
-            style={styles.modalSave}
-            onPress={() => {
-              // Salvar alterações no workouts.json
-              setWorkoutModalVisible(false);
-            }}
-          >
-            <Text style={styles.modalSaveText}>Salvar</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
+      <PersonalizarTreinoModal
+        isVisible={isWorkoutModalVisible}
+        onClose={() => setWorkoutModalVisible(false)}
+        dayName={dayName}
+        initialWorkout={todayWorkout}
+        onSave={(updatedWorkout) => {
+          setTodayWorkout(updatedWorkout);
+          setWorkoutModalVisible(false);
+        }}
+      />
+         <Modal
+              visible={isOtherWorkoutsModalVisible}
+              transparent
+              animationType="slide"
+              onRequestClose={() => setOtherWorkoutsModalVisible(false)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={styles.modalContainer}>
+                  <Text style={styles.modalTitle}>Outros Treinos</Text>
+                  <FlatList
+                    data={Object.entries(workouts)}
+                    renderItem={renderWorkoutItem}
+                    keyExtractor={(item) => item[0]}
+                    style={styles.workoutList}
+                  />
+                  <TouchableOpacity
+                    style={styles.closeButton}
+                    onPress={() => setOtherWorkoutsModalVisible(false)}
+                  >
+                    <Text style={styles.buttonText}>Fechar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
 
-      {/* Modal para Treino Customizado */}
-      <Modal
-        visible={isCustomWorkoutModalVisible}
-        transparent
-        animationType="slide"
-      >
-        <View style={styles.modal}>
-          <Text style={styles.modalTitle}>Invente seu próprio treino!</Text>
-          <Text style={styles.modalText}>
-            "O treino perfeito é aquele que combina com você. Vamos criar algo
-            único?"
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Descreva seu treino..."
-            value={customWorkout}
-            onChangeText={setCustomWorkout}
-          />
-          <TouchableOpacity
-            style={styles.modalSave}
-            onPress={() => {
-              setCustomWorkoutModalVisible(false);
-              console.log(customWorkout); // Aqui será enviado ao backend
-            }}
-          >
-            <Text style={styles.modalSaveText}>Salvar</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
+        <TreineSeuJeitoModal
+              visible={isTreineSeuJeitoModalVisible}
+              onClose={() => setTreineSeuJeitoModalVisible(false)}
+              onSubmit={(data) => {
+                console.log("Texto:", data.text);
+                console.log("Imagem URI:", data.image);
+                // Aqui você pode adicionar a lógica para lidar com os dados submetidos
+                setTreineSeuJeitoModalVisible(false);
+              }}
+            />
+
     </View>
   );
 };
@@ -229,53 +272,40 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  lastButton: {
-    width: "100%",
-    backgroundColor: "#1f1f1f",
-    padding: 15,
-    marginBottom: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   buttonText: {
     color: "white",
     marginTop: 10,
   },
-  modal: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContainer: {
+    backgroundColor: "white",
+    borderRadius: 10,
     padding: 20,
+    margin: 20,
   },
   modalTitle: {
-    fontSize: 20,
-    color: "white",
-    marginBottom: 10,
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 15,
   },
   modalOption: {
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#ccc",
   },
-  modalText: {
-    color: "white",
-    marginBottom: 20,
+  modalOptionText: {
+    fontSize: 16,
   },
-  modalSave: {
-    backgroundColor: "#1f1f1f",
+  closeButton: {
+    backgroundColor: "#f44336",
     padding: 10,
     borderRadius: 5,
-    marginTop: 10,
-  },
-  modalSaveText: {
-    color: "white",
-    textAlign: "center",
-  },
-  input: {
-    backgroundColor: "white",
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 10,
+    marginTop: 20,
+    alignItems: "center",
   },
 });
 
