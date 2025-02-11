@@ -73,7 +73,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         headerImage={
           <Image
             source={require('@/assets/images/home_img.jpeg')}
-            style={styles.reactLogo}
+            style={styles.topImage}
           />
         }
       >
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 15,
   },
-  reactLogo: {
+  topImage: {
     height: 500,
     width: 500,
     bottom: 0,
