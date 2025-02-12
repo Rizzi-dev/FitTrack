@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, FlatList, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import workouts from '@/datas/workouts.json';
 
 // Simulação de dados de alunos e notificações
@@ -23,6 +24,7 @@ const DashboardInstrutor = () => {
   const [isProfileModalVisible, setProfileModalVisible] = useState(false);
   const [selectedGym, setSelectedGym] = useState('Fit Center');
   const [searchTerm, setSearchTerm] = useState('');
+  const [location, setLocation] = useState(null);
 
   useEffect(() => {
     const today = new Date();
@@ -30,7 +32,25 @@ const DashboardInstrutor = () => {
     setDayName(currentDayName);
     const workoutPlan = workouts[currentDayName];
     setTodayWorkout(workoutPlan || null);
+
+    getCurrentLocation();
   }, []);
+
+  const getCurrentLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permissão Negada', 'Permissão de localização é necessária para exibir a localização.');
+        return;
+      }
+
+      const currentLocation = await Location.getCurrentPositionAsync({});
+      setLocation(currentLocation.coords);
+    } catch (error) {
+      console.error('Erro ao obter localização:', error);
+      Alert.alert('Erro', 'Não foi possível obter a localização.');
+    }
+  };
 
   const renderStudentItem = ({ item }) => (
     <TouchableOpacity
@@ -83,6 +103,19 @@ const DashboardInstrutor = () => {
           <Ionicons name="person-outline" size={24} color="white" />
           <Text style={styles.buttonText}>Meu Perfil</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Exibir localização em tempo real */}
+      <View style={styles.locationContainer}>
+      <Text style={styles.locationText}>
+                Sua localização atual é:
+              </Text>
+        <Text style={styles.locationText}>
+          Latitude: {location?.latitude.toFixed(6) || "Obtendo..."}
+        </Text>
+        <Text style={styles.locationText}>
+          Longitude: {location?.longitude.toFixed(6) || "Obtendo..."}
+        </Text>
       </View>
 
       {/* Modal para Mudar Academia */}
@@ -315,6 +348,17 @@ const styles = StyleSheet.create({
   editButtonText: {
     color: 'white',
     fontSize: 16,
+  },
+  locationContainer: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#1f1f1f',
+    borderRadius: 8,
+  },
+  locationText: {
+    color: 'white',
+    fontSize: 16,
+    marginBottom: 5,
   },
 });
 

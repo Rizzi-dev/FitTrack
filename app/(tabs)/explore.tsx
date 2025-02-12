@@ -115,7 +115,10 @@ export default function UserRegistration() {
 const styles = StyleSheet.create({
   headerImage: {
     height: 500,
-    width: '100%',
+    width: 500,
+    bottom: 0,
+    top: 0,
+    left: 0,
     position: 'absolute',
   },
   titleContainer: {

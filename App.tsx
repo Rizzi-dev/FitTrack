@@ -1,7 +1,12 @@
-
-import React from 'react';
-import AppNavigator from './src/AppNavigator'; // Ajuste o caminho conforme necessário
+import React from "react";
+import { Toast } from "react-native-toast-message";
+import { Slot } from "expo-router"; // Para uso com o Expo Router
 
 export default function App() {
-  return <AppNavigator />;
+  return (
+    <>
+      <Slot /> {/* Gerencia as rotas com o Expo Router */}
+      <Toast /> {/* Adiciona o componente Toast global */}
+    </>
+  );
 }
