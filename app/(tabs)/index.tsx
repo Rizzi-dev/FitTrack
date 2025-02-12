@@ -1,40 +1,34 @@
+import React, { useState } from 'react';
+import { useRouter } from 'expo-router';
 import { Image, StyleSheet, TextInput, Button, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { useState } from 'react';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 
-import { authenticateUser } from '@/services/users';
+import { getUserByEmail, getUserType } from '@/services/userService';
 
-type RootStackParamList = {
-  Home: undefined;
-  MainDashboard: undefined;
-};
-
-type HomeScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  'Home'
->;
-
-interface HomeScreenProps {
-  navigation: HomeScreenNavigationProp;
-}
-
-export default function HomeScreen({ navigation }: HomeScreenProps) {
-  const [username, setUsername] = useState<string>('');
+export default function HomeScreen() {
+  const router = useRouter(); // Substitui useNavigation
+  const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
 
   const handleLogin = async () => {
     try {
-      const isAuthenticated = await authenticateUser(username, password);
-      if (isAuthenticated) {
+      const user = await getUserByEmail(email);
+      if (user && user.password === password) {
+        const userType = await getUserType(email);
         Alert.alert('Login bem-sucedido!', 'Bem-vindo ao FitTrack!');
-        navigation.navigate('MainDashboard');
+        if (userType === 'aluno') {
+          router.push('/views/dashAluno'); // Navega para a tela do aluno
+        } else if (userType === 'instrutor') {
+          router.push('/views/dashInstrutor'); // Navega para a tela do instrutor
+        } else {
+          Alert.alert('Erro', 'Tipo de usuário não reconhecido');
+        }
       } else {
-        Alert.alert('Erro', 'Usuário ou senha incorretos');
+        Alert.alert('Erro', 'E-mail ou senha incorretos');
       }
     } catch (error) {
       console.error(error);
@@ -72,10 +66,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         <ThemedView style={styles.loginContainer}>
           <ThemedText style={styles.stepContainer}>Faça seu login</ThemedText>
           <TextInput
-            placeholder="Usuário"
-            value={username}
-            onChangeText={setUsername}
+            placeholder="E-mail"
+            value={email}
+            onChangeText={setEmail}
             style={styles.input}
+            keyboardType="email-address"
           />
           <TextInput
             placeholder="Senha"
