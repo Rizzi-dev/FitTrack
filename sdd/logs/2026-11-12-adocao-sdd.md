@@ -20,7 +20,7 @@
 - Front: URL padrão alterada para `:3000` em `services/api.ts` e `.env.example`.
 
 ## Pendente
-- Back: `git init` e decisão de banco/ORM (api:ADR-0006, Proposta).
+- ~~Back: `git init`~~ feito (api:TASK-001 em andamento). Falta a decisão de banco/ORM (api:ADR-0006, Proposta).
 
 ## Regras dos agentes
 - Regras obrigatórias adicionadas ao `AGENTS.md` (idênticas nos dois repos): ler o SDD antes do código, nunca assumir contexto, código como fonte da verdade, conhecimento só em arquivos do `sdd/`, código limpo e reutilizável, sem comentários desnecessários, sempre atualizar o SDD, deixar o projeto melhor, sem co-autoria nos commits e sem assinatura de IA em PRs.
