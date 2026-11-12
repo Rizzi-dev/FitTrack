@@ -7,32 +7,34 @@ import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 
-import { getUserByEmail, getUserType } from '@/services/userService';
+import { login } from '@/services/authService';
+import { getErrorMessage } from '@/services/api';
 
 export default function HomeScreen() {
-  const router = useRouter(); // Substitui useNavigation
+  const router = useRouter();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Erro', 'Informe e-mail e senha.');
+      return;
+    }
+    setLoading(true);
     try {
-      const user = await getUserByEmail(email);
-      if (user && user.password === password) {
-        const userType = await getUserType(email);
-        Alert.alert('Login bem-sucedido!', 'Bem-vindo ao FitTrack!');
-        if (userType === 'aluno') {
-          router.push('/views/dashAluno'); // Navega para a tela do aluno
-        } else if (userType === 'instrutor') {
-          router.push('/views/dashInstrutor'); // Navega para a tela do instrutor
-        } else {
-          Alert.alert('Erro', 'Tipo de usuário não reconhecido');
-        }
+      const user = await login(email.trim().toLowerCase(), password);
+      if (user.user_type === 'student') {
+        router.replace('/views/dashAluno');
+      } else if (user.user_type === 'instructor') {
+        router.replace('/views/dashInstrutor');
       } else {
-        Alert.alert('Erro', 'E-mail ou senha incorretos');
+        Alert.alert('Erro', 'Tipo de usuário não reconhecido');
       }
     } catch (error) {
-      console.error(error);
-      Alert.alert('Erro', 'Houve um problema na autenticação. Tente novamente.');
+      Alert.alert('Erro', getErrorMessage(error, 'E-mail ou senha incorretos'));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -71,6 +73,7 @@ export default function HomeScreen() {
             onChangeText={setEmail}
             style={styles.input}
             keyboardType="email-address"
+            autoCapitalize="none"
           />
           <TextInput
             placeholder="Senha"
@@ -79,7 +82,7 @@ export default function HomeScreen() {
             secureTextEntry
             style={styles.input}
           />
-          <Button title="Entrar" onPress={handleLogin} />
+          <Button title={loading ? 'Entrando...' : 'Entrar'} onPress={handleLogin} disabled={loading} />
         </ThemedView>
       </ParallaxScrollView>
     </KeyboardAvoidingView>

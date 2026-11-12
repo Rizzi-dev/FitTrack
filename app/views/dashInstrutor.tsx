@@ -1,40 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, FlatList, TextInput, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  FlatList,
+  TextInput,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import workouts from '@/datas/workouts.json';
+import { useRouter } from 'expo-router';
 
-// Simulação de dados de alunos e notificações
-const mockStudents = [
-  { id: '1', name: 'João Silva', lastWorkout: '2025-02-10' },
-  { id: '2', name: 'Maria Oliveira', lastWorkout: '2025-02-11' },
-];
+import { DAY_LABELS, getTodayKey } from '@/constants/days';
+import { getErrorMessage } from '@/services/api';
+import { logout } from '@/services/authService';
+import { getMyStudents, getNotifications } from '@/services/instructorService';
+import { getGyms, getMe, updateMe } from '@/services/userService';
+import { Gym, Notification, Student, User } from '@/services/types';
 
-const mockNotifications = [
-  { id: '1', message: 'João Silva solicitou modificação no treino', date: '2025-02-11' },
-  { id: '2', message: 'Maria Oliveira completou o treino de hoje', date: '2025-02-11' },
-];
+const formatDate = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString('pt-BR') : '—';
 
 const DashboardInstrutor = () => {
-  const [dayName, setDayName] = useState('');
-  const [todayWorkout, setTodayWorkout] = useState(null);
+  const router = useRouter();
+  const todayLabel = DAY_LABELS[getTodayKey()];
+
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [gyms, setGyms] = useState<Gym[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isGymModalVisible, setGymModalVisible] = useState(false);
   const [isStudentsModalVisible, setStudentsModalVisible] = useState(false);
   const [isNotificationsModalVisible, setNotificationsModalVisible] = useState(false);
   const [isProfileModalVisible, setProfileModalVisible] = useState(false);
-  const [selectedGym, setSelectedGym] = useState('Fit Center');
+  const [isEditingProfile, setEditingProfile] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profileSpecialty, setProfileSpecialty] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [location, setLocation] = useState(null);
+  const [location, setLocation] = useState<Location.LocationObjectCoords | null>(null);
+
+  const loadUser = useCallback(async () => {
+    setLoading(true);
+    try {
+      setUser(await getMe());
+    } catch (error) {
+      Alert.alert('Erro', getErrorMessage(error, 'Não foi possível carregar seus dados.'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const today = new Date();
-    const currentDayName = today.toLocaleDateString('pt-BR', { weekday: 'long' }).toLowerCase();
-    setDayName(currentDayName);
-    const workoutPlan = workouts[currentDayName];
-    setTodayWorkout(workoutPlan || null);
-
+    loadUser();
     getCurrentLocation();
-  }, []);
+  }, [loadUser]);
 
   const getCurrentLocation = async () => {
     try {
@@ -52,73 +75,138 @@ const DashboardInstrutor = () => {
     }
   };
 
-  const renderStudentItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.listItem}
-      onPress={() => Alert.alert('Modificar Treino', `Modificar treino de ${item.name}`)}
-    >
-      <Text style={styles.listItemText}>{item.name}</Text>
-      <Text style={styles.listItemSubtext}>Último treino: {item.lastWorkout}</Text>
-    </TouchableOpacity>
-  );
+  const openGymModal = async () => {
+    setGymModalVisible(true);
+    try {
+      setGyms(await getGyms());
+    } catch (error) {
+      Alert.alert('Erro', getErrorMessage(error, 'Não foi possível carregar as academias.'));
+    }
+  };
 
-  const renderNotificationItem = ({ item }) => (
+  const handleSelectGym = async (gym: Gym) => {
+    try {
+      setUser(await updateMe({ gym_id: gym.id }));
+      setGymModalVisible(false);
+    } catch (error) {
+      Alert.alert('Erro', getErrorMessage(error, 'Não foi possível trocar de academia.'));
+    }
+  };
+
+  const loadStudents = async (search?: string) => {
+    try {
+      setStudents(await getMyStudents(search));
+    } catch (error) {
+      Alert.alert('Erro', getErrorMessage(error, 'Não foi possível carregar os alunos.'));
+    }
+  };
+
+  const openStudentsModal = () => {
+    setStudentsModalVisible(true);
+    loadStudents(searchTerm.trim() || undefined);
+  };
+
+  const openNotificationsModal = async () => {
+    setNotificationsModalVisible(true);
+    try {
+      setNotifications(await getNotifications());
+    } catch (error) {
+      Alert.alert('Erro', getErrorMessage(error, 'Não foi possível carregar as notificações.'));
+    }
+  };
+
+  const openProfileModal = () => {
+    setProfileName(user?.name ?? '');
+    setProfileSpecialty(user?.specialty ?? '');
+    setEditingProfile(false);
+    setProfileModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!profileName.trim()) {
+      Alert.alert('Erro', 'O nome não pode ficar vazio.');
+      return;
+    }
+    try {
+      setUser(
+        await updateMe({ name: profileName.trim(), specialty: profileSpecialty.trim() || null })
+      );
+      setEditingProfile(false);
+    } catch (error) {
+      Alert.alert('Erro', getErrorMessage(error, 'Não foi possível atualizar o perfil.'));
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/');
+  };
+
+  const renderStudentItem = ({ item }: { item: Student }) => (
     <View style={styles.listItem}>
-      <Text style={styles.listItemText}>{item.message}</Text>
-      <Text style={styles.listItemSubtext}>{item.date}</Text>
+      <Text style={styles.listItemText}>{item.name}</Text>
+      <Text style={styles.listItemSubtext}>Último treino: {formatDate(item.last_workout_at)}</Text>
     </View>
   );
 
+  const renderNotificationItem = ({ item }: { item: Notification }) => (
+    <View style={styles.listItem}>
+      <Text style={[styles.listItemText, !item.read && styles.unread]}>{item.message}</Text>
+      <Text style={styles.listItemSubtext}>{formatDate(item.created_at)}</Text>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="white" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Text style={styles.date}>Hoje: {dayName.charAt(0).toUpperCase() + dayName.slice(1)}</Text>
-      <Text style={styles.academia}>Academia Selecionada: {selectedGym}</Text>
-
-      <View style={styles.workout}>
-        <Text style={styles.treino}>Treino de Hoje: {todayWorkout?.treino || 'Descanso'}</Text>
-        {todayWorkout?.exercicios?.map((exercicio, index) => (
-          <Text key={index} style={styles.exercicio}>
-            - {exercicio.maquina}: {exercicio.series}
-          </Text>
-        ))}
+      <View style={styles.header}>
+        <Text style={styles.greeting}>Olá, {user?.name ?? 'instrutor'}</Text>
+        <TouchableOpacity onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={24} color="white" />
+        </TouchableOpacity>
       </View>
+      <Text style={styles.date}>Hoje: {todayLabel}</Text>
+      <Text style={styles.academia}>Academia Selecionada: {user?.gym?.name ?? 'Nenhuma'}</Text>
 
       <View style={styles.buttons}>
-        <TouchableOpacity style={styles.button} onPress={() => setGymModalVisible(true)}>
+        <TouchableOpacity style={styles.button} onPress={openGymModal}>
           <Ionicons name="swap-horizontal-outline" size={24} color="white" />
           <Text style={styles.buttonText}>Mudar Academia</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.button} onPress={() => setStudentsModalVisible(true)}>
+        <TouchableOpacity style={styles.button} onPress={openStudentsModal}>
           <Ionicons name="people-outline" size={24} color="white" />
           <Text style={styles.buttonText}>Gerenciar Alunos</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.button} onPress={() => setNotificationsModalVisible(true)}>
+        <TouchableOpacity style={styles.button} onPress={openNotificationsModal}>
           <Ionicons name="notifications-outline" size={24} color="white" />
           <Text style={styles.buttonText}>Notificações</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.button} onPress={() => setProfileModalVisible(true)}>
+        <TouchableOpacity style={styles.button} onPress={openProfileModal}>
           <Ionicons name="person-outline" size={24} color="white" />
           <Text style={styles.buttonText}>Meu Perfil</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Exibir localização em tempo real */}
       <View style={styles.locationContainer}>
-      <Text style={styles.locationText}>
-                Sua localização atual é:
-              </Text>
+        <Text style={styles.locationText}>Sua localização atual é:</Text>
         <Text style={styles.locationText}>
-          Latitude: {location?.latitude.toFixed(6) || "Obtendo..."}
+          Latitude: {location?.latitude.toFixed(6) ?? 'Obtendo...'}
         </Text>
         <Text style={styles.locationText}>
-          Longitude: {location?.longitude.toFixed(6) || "Obtendo..."}
+          Longitude: {location?.longitude.toFixed(6) ?? 'Obtendo...'}
         </Text>
       </View>
 
-      {/* Modal para Mudar Academia */}
       <Modal
         visible={isGymModalVisible}
         transparent
@@ -128,18 +216,16 @@ const DashboardInstrutor = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Escolha a Academia</Text>
-            {['Fit Center', 'Power Gym', 'Elite Fitness'].map((gym) => (
-              <TouchableOpacity
-                key={gym}
-                style={styles.modalOption}
-                onPress={() => {
-                  setSelectedGym(gym);
-                  setGymModalVisible(false);
-                }}
-              >
-                <Text style={styles.modalOptionText}>{gym}</Text>
-              </TouchableOpacity>
-            ))}
+            <FlatList
+              data={gyms}
+              keyExtractor={(item) => item.id.toString()}
+              ListEmptyComponent={<Text>Nenhuma academia disponível.</Text>}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectGym(item)}>
+                  <Text style={styles.modalOptionText}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+            />
             <TouchableOpacity style={styles.closeButton} onPress={() => setGymModalVisible(false)}>
               <Text style={styles.closeButtonText}>Fechar</Text>
             </TouchableOpacity>
@@ -147,7 +233,6 @@ const DashboardInstrutor = () => {
         </View>
       </Modal>
 
-      {/* Modal para Gerenciar Alunos */}
       <Modal
         visible={isStudentsModalVisible}
         transparent
@@ -162,13 +247,14 @@ const DashboardInstrutor = () => {
               placeholder="Buscar aluno..."
               value={searchTerm}
               onChangeText={setSearchTerm}
+              onSubmitEditing={() => loadStudents(searchTerm.trim() || undefined)}
+              returnKeyType="search"
             />
             <FlatList
-              data={mockStudents.filter(student =>
-                student.name.toLowerCase().includes(searchTerm.toLowerCase())
-              )}
+              data={students}
               renderItem={renderStudentItem}
-              keyExtractor={item => item.id}
+              keyExtractor={(item) => item.id.toString()}
+              ListEmptyComponent={<Text>Nenhum aluno encontrado.</Text>}
             />
             <TouchableOpacity style={styles.closeButton} onPress={() => setStudentsModalVisible(false)}>
               <Text style={styles.closeButtonText}>Fechar</Text>
@@ -177,7 +263,6 @@ const DashboardInstrutor = () => {
         </View>
       </Modal>
 
-      {/* Modal para Notificações */}
       <Modal
         visible={isNotificationsModalVisible}
         transparent
@@ -188,9 +273,10 @@ const DashboardInstrutor = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Notificações</Text>
             <FlatList
-              data={mockNotifications}
+              data={notifications}
               renderItem={renderNotificationItem}
-              keyExtractor={item => item.id}
+              keyExtractor={(item) => item.id.toString()}
+              ListEmptyComponent={<Text>Nenhuma notificação.</Text>}
             />
             <TouchableOpacity style={styles.closeButton} onPress={() => setNotificationsModalVisible(false)}>
               <Text style={styles.closeButtonText}>Fechar</Text>
@@ -199,7 +285,6 @@ const DashboardInstrutor = () => {
         </View>
       </Modal>
 
-      {/* Modal para Perfil do Instrutor */}
       <Modal
         visible={isProfileModalVisible}
         transparent
@@ -209,12 +294,34 @@ const DashboardInstrutor = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Meu Perfil</Text>
-            <Text style={styles.profileInfo}>Nome: João Instrutor</Text>
-            <Text style={styles.profileInfo}>Email: joao@exemplo.com</Text>
-            <Text style={styles.profileInfo}>Especialidade: Musculação</Text>
-            <TouchableOpacity style={styles.editButton}>
-              <Text style={styles.editButtonText}>Editar Perfil</Text>
-            </TouchableOpacity>
+            {isEditingProfile ? (
+              <>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Nome"
+                  value={profileName}
+                  onChangeText={setProfileName}
+                />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Especialidade"
+                  value={profileSpecialty}
+                  onChangeText={setProfileSpecialty}
+                />
+                <TouchableOpacity style={styles.editButton} onPress={handleSaveProfile}>
+                  <Text style={styles.editButtonText}>Salvar</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.profileInfo}>Nome: {user?.name}</Text>
+                <Text style={styles.profileInfo}>Email: {user?.email}</Text>
+                <Text style={styles.profileInfo}>Especialidade: {user?.specialty ?? '—'}</Text>
+                <TouchableOpacity style={styles.editButton} onPress={() => setEditingProfile(true)}>
+                  <Text style={styles.editButtonText}>Editar Perfil</Text>
+                </TouchableOpacity>
+              </>
+            )}
             <TouchableOpacity style={styles.closeButton} onPress={() => setProfileModalVisible(false)}>
               <Text style={styles.closeButtonText}>Fechar</Text>
             </TouchableOpacity>
@@ -226,6 +333,24 @@ const DashboardInstrutor = () => {
 };
 
 const styles = StyleSheet.create({
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  greeting: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  unread: {
+    fontWeight: 'bold',
+  },
   container: {
     flex: 1,
     backgroundColor: '#000011',

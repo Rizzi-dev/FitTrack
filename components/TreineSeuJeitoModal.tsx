@@ -11,9 +11,16 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const TreineSeuJeitoModal = ({ visible, onClose, onSubmit }) => {
+interface TreineSeuJeitoModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onSubmit: (data: { text: string; image: string | null }) => Promise<void>;
+}
+
+const TreineSeuJeitoModal = ({ visible, onClose, onSubmit }: TreineSeuJeitoModalProps) => {
   const [customText, setCustomText] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -23,7 +30,7 @@ const TreineSeuJeitoModal = ({ visible, onClose, onSubmit }) => {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 3],
       quality: 1,
@@ -34,15 +41,23 @@ const TreineSeuJeitoModal = ({ visible, onClose, onSubmit }) => {
     }
   };
 
-  const handleSubmit = () => {
-    onSubmit({ text: customText, image: selectedImage });
-    setCustomText('');
-    setSelectedImage(null);
-    onClose();
+  const handleSubmit = async () => {
+    if (!customText.trim()) {
+      alert('Descreva seu treino antes de salvar.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSubmit({ text: customText.trim(), image: selectedImage });
+      setCustomText('');
+      setSelectedImage(null);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalBackground}>
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>
@@ -62,9 +77,9 @@ const TreineSeuJeitoModal = ({ visible, onClose, onSubmit }) => {
               <Ionicons name="camera-outline" size={24} color="white" />
               <Text style={styles.buttonText}>Capturar Imagem</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+            <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={saving}>
               <Ionicons name="save-outline" size={24} color="white" />
-              <Text style={styles.buttonText}>Salvar</Text>
+              <Text style={styles.buttonText}>{saving ? 'Enviando...' : 'Salvar'}</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>

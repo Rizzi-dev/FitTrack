@@ -1,169 +1,229 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Modal, FlatList, Alert, Platform } from "react-native";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  FlatList,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system";
-import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
-import * as Permissions from 'expo-permissions';
-
-import workouts from "@/datas/workouts.json";
-import gyms from "@/datas/gyms.json";
-import PersonalizarTreinoModal from "@/components/PersonalizarTreinoModal";
-import TreineSeuJeitoModal from "@/components/TreineSeuJeitoModal";
+import { useRouter } from "expo-router";
 import Toast from "react-native-toast-message";
 
+import PersonalizarTreinoModal from "@/components/PersonalizarTreinoModal";
+import TreineSeuJeitoModal from "@/components/TreineSeuJeitoModal";
+import { DAY_LABELS, WEEK_ORDER, getTodayKey } from "@/constants/days";
+import { getErrorMessage } from "@/services/api";
+import { logout } from "@/services/authService";
+import { callInstructor } from "@/services/instructorService";
+import { getGyms, getMe, updateMe } from "@/services/userService";
+import { createCustomWorkout, getMyWorkouts, saveMyWorkout } from "@/services/workoutService";
+import { Gym, User, Workout, WorkoutPayload } from "@/services/types";
+
 const DashboardAluno = () => {
-  const [dayName, setDayName] = useState("");
-  const [todayWorkout, setTodayWorkout] = useState(null);
-  const [selectedGym, setSelectedGym] = useState("Fit Center");
+  const router = useRouter();
+  const todayKey = getTodayKey();
+  const todayLabel = DAY_LABELS[todayKey];
+
+  const [user, setUser] = useState<User | null>(null);
+  const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [gyms, setGyms] = useState<Gym[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isWorkoutModalVisible, setWorkoutModalVisible] = useState(false);
   const [isGymModalVisible, setGymModalVisible] = useState(false);
   const [isOtherWorkoutsModalVisible, setOtherWorkoutsModalVisible] = useState(false);
   const [isTreineSeuJeitoModalVisible, setTreineSeuJeitoModalVisible] = useState(false);
 
-  useEffect(() => {
-    const today = new Date();
-    const dayName = today.toLocaleDateString("pt-BR", { weekday: "long" }).toLowerCase();
-    setDayName(dayName);
-    updateTodayWorkout(dayName);
+  const todayWorkout = useMemo(
+    () => workouts.find((w) => w.day_of_week === todayKey) ?? null,
+    [workouts, todayKey]
+  );
+
+  const sortedWorkouts = useMemo(
+    () =>
+      [...workouts].sort(
+        (a, b) => WEEK_ORDER.indexOf(a.day_of_week) - WEEK_ORDER.indexOf(b.day_of_week)
+      ),
+    [workouts]
+  );
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [me, myWorkouts] = await Promise.all([getMe(), getMyWorkouts()]);
+      setUser(me);
+      setWorkouts(myWorkouts);
+    } catch (error) {
+      Alert.alert("Erro", getErrorMessage(error, "Não foi possível carregar seus dados."));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const updateTodayWorkout = (day) => {
-    const workoutPlan = workouts[day];
-    if (workoutPlan) {
-      setTodayWorkout(workoutPlan);
-    } else {
-      setTodayWorkout({ treino: "Descanso", exercicios: [] });
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const openGymModal = async () => {
+    setGymModalVisible(true);
+    try {
+      setGyms(await getGyms());
+    } catch (error) {
+      Alert.alert("Erro", getErrorMessage(error, "Não foi possível carregar as academias."));
     }
   };
 
-   const shareWorkout = async () => {
-     if (!todayWorkout) {
-       Alert.alert("Erro", "Não há treino disponível para compartilhar.");
-       return;
-     }
+  const handleSelectGym = async (gym: Gym) => {
+    try {
+      setUser(await updateMe({ gym_id: gym.id }));
+      setGymModalVisible(false);
+    } catch (error) {
+      Alert.alert("Erro", getErrorMessage(error, "Não foi possível trocar de academia."));
+    }
+  };
 
-     const workoutString = JSON.stringify(todayWorkout, null, 2);
-     const fileName = `treino_${dayName}.json`;
-     const filePath = `${FileSystem.cacheDirectory}${fileName}`;
+  const handleSaveWorkout = async (payload: WorkoutPayload) => {
+    try {
+      const saved = await saveMyWorkout(todayKey, payload);
+      setWorkouts((list) => [...list.filter((w) => w.day_of_week !== todayKey), saved]);
+      setWorkoutModalVisible(false);
+      Alert.alert("Sucesso", "Treino atualizado com sucesso!");
+    } catch (error) {
+      Alert.alert("Erro", getErrorMessage(error, "Não foi possível salvar o treino."));
+    }
+  };
 
-     try {
-       await FileSystem.writeAsStringAsync(filePath, workoutString);
+  const handleCallInstructor = async () => {
+    try {
+      await callInstructor();
+      Toast.show({ type: "success", text1: "Notificação enviada ao instrutor" });
+    } catch (error) {
+      Toast.show({ type: "error", text1: getErrorMessage(error, "Não foi possível chamar o instrutor.") });
+    }
+  };
 
-       if (await Sharing.isAvailableAsync()) {
-         await Sharing.shareAsync(filePath, {
-           mimeType: 'application/json',
-           dialogTitle: 'Salvar treino',
-           UTI: 'public.json' // Isso é necessário para iOS
-         });
-         Alert.alert("Sucesso", "Arquivo de treino compartilhado com sucesso!");
-       } else {
-         Alert.alert("Erro", "Compartilhamento não está disponível neste dispositivo.");
-       }
-     } catch (error) {
-       console.error("Erro ao compartilhar o treino:", error);
-       Alert.alert("Erro", "Não foi possível compartilhar o arquivo de treino.");
-     } finally {
-       // Limpar o arquivo temporário
-       await FileSystem.deleteAsync(filePath, { idempotent: true });
-     }
-   };
+  const handleCustomWorkout = async ({ text, image }: { text: string; image: string | null }) => {
+    try {
+      await createCustomWorkout(text, image);
+      setTreineSeuJeitoModalVisible(false);
+      Alert.alert("Sucesso", "Seu treino foi enviado!");
+    } catch (error) {
+      Alert.alert("Erro", getErrorMessage(error, "Não foi possível enviar seu treino."));
+    }
+  };
 
-   const renderWorkoutItem = ({ item: [day, workout] }) => (
-       <View style={styles.workoutItem}>
-         <Text style={styles.workoutDay}>{day.charAt(0).toUpperCase() + day.slice(1)}</Text>
-         <Text style={styles.workoutName}>{workout.treino}</Text>
-         {workout.exercicios.map((exercicio, index) => (
-           <Text key={index} style={styles.workoutExercise}>
-             - {exercicio.maquina}: {exercicio.series}
-           </Text>
-         ))}
-       </View>
-     );
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/");
+  };
 
- const requestPermissions = async () => {
-   const { status } = await Permissions.askAsync(Permissions.MEDIA_LIBRARY_WRITE_ONLY);
-   if (status !== 'granted') {
-     Alert.alert('Permissão necessária', 'É necessário permitir acesso ao armazenamento para salvar os arquivos.');
-     return false;
-   }
-   return true;
- };
+  const shareWorkout = async () => {
+    if (!todayWorkout) {
+      Alert.alert("Erro", "Não há treino disponível para compartilhar.");
+      return;
+    }
+
+    const filePath = `${FileSystem.cacheDirectory}treino_${todayKey}.json`;
+
+    try {
+      await FileSystem.writeAsStringAsync(filePath, JSON.stringify(todayWorkout, null, 2));
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(filePath, {
+          mimeType: "application/json",
+          dialogTitle: "Salvar treino",
+          UTI: "public.json", // Necessário para iOS
+        });
+      } else {
+        Alert.alert("Erro", "Compartilhamento não está disponível neste dispositivo.");
+      }
+    } catch (error) {
+      console.error("Erro ao compartilhar o treino:", error);
+      Alert.alert("Erro", "Não foi possível compartilhar o arquivo de treino.");
+    } finally {
+      await FileSystem.deleteAsync(filePath, { idempotent: true });
+    }
+  };
+
+  const renderWorkoutItem = ({ item }: { item: Workout }) => (
+    <View style={styles.workoutItem}>
+      <Text style={styles.workoutDay}>{DAY_LABELS[item.day_of_week]}</Text>
+      <Text style={styles.workoutName}>{item.name}</Text>
+      {item.exercises.map((exercise, index) => (
+        <Text key={index} style={styles.workoutExercise}>
+          - {exercise.machine}: {exercise.sets}
+        </Text>
+      ))}
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="white" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.date}>
-        Hoje: {dayName.charAt(0).toUpperCase() + dayName.slice(1)}
+      <View style={styles.header}>
+        <Text style={styles.greeting}>Olá, {user?.name ?? "aluno"}</Text>
+        <TouchableOpacity onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.date}>Hoje: {todayLabel}</Text>
+      <Text style={styles.academia}>
+        Academia Selecionada: {user?.gym?.name ?? "Nenhuma"}
       </Text>
-      <Text style={styles.academia}>Academia Selecionada: {selectedGym}</Text>
 
       <View style={styles.workout}>
-        <Text style={styles.treino}>
-          Treino de Hoje: {todayWorkout?.treino || "Descanso"}
-        </Text>
-        {todayWorkout?.exercicios.map((exercicio, index) => (
+        <Text style={styles.treino}>Treino de Hoje: {todayWorkout?.name ?? "Descanso"}</Text>
+        {todayWorkout?.exercises.map((exercise, index) => (
           <Text key={index} style={styles.exercicio}>
-            - {exercicio.maquina}: {exercicio.series}
+            - {exercise.machine}: {exercise.sets}
           </Text>
         ))}
       </View>
 
       <View style={styles.buttons}>
-        {/* Mudar Academia */}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => setGymModalVisible(true)}
-        >
+        <TouchableOpacity style={styles.button} onPress={openGymModal}>
           <Ionicons name="swap-horizontal-outline" size={24} color="white" />
           <Text style={styles.buttonText}>Mudar Academia</Text>
         </TouchableOpacity>
 
-        {/* Personalizar Treino */}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => setWorkoutModalVisible(true)}
-        >
+        <TouchableOpacity style={styles.button} onPress={() => setWorkoutModalVisible(true)}>
           <Ionicons name="pencil-outline" size={24} color="white" />
           <Text style={styles.buttonText}>Personalizar Treino</Text>
         </TouchableOpacity>
 
-        {/* Chamar Instrutor */}
-       <TouchableOpacity
-         style={styles.button}
-         onPress={() => {
-           Toast.show({
-             type: "success",
-             text1: "Notificação enviada ao instrutor", // Mensagem principal
-           });
-         }}
-       >
-         <Ionicons name="person-outline" size={24} color="white" />
-         <Text style={styles.buttonText}>Chamar Instrutor</Text>
-       </TouchableOpacity>
+        <TouchableOpacity style={styles.button} onPress={handleCallInstructor}>
+          <Ionicons name="person-outline" size={24} color="white" />
+          <Text style={styles.buttonText}>Chamar Instrutor</Text>
+        </TouchableOpacity>
 
-        {/* Ver Outros Treinos */}
         <TouchableOpacity style={styles.button} onPress={() => setOtherWorkoutsModalVisible(true)}>
           <Ionicons name="list-outline" size={24} color="white" />
           <Text style={styles.buttonText}>Ver Outros Treinos</Text>
         </TouchableOpacity>
 
-        {/* Botão de Download */}
         <TouchableOpacity style={styles.button} onPress={shareWorkout}>
           <Ionicons name="download-outline" size={24} color="white" />
           <Text style={styles.buttonText}>Fazer download deste treino</Text>
         </TouchableOpacity>
 
-          <TouchableOpacity
-                  style={styles.button}
-                  onPress={() => setTreineSeuJeitoModalVisible(true)}
-                >
-                  <Ionicons name="create-outline" size={24} color="white" />
-                  <Text style={styles.buttonText}>Gostaria de treinar do seu jeito?</Text>
-          </TouchableOpacity>
-
+        <TouchableOpacity style={styles.button} onPress={() => setTreineSeuJeitoModalVisible(true)}>
+          <Ionicons name="create-outline" size={24} color="white" />
+          <Text style={styles.buttonText}>Gostaria de treinar do seu jeito?</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Modal para Mudar Academia */}
       <Modal
         visible={isGymModalVisible}
         transparent
@@ -176,21 +236,47 @@ const DashboardAluno = () => {
             <FlatList
               data={gyms}
               keyExtractor={(item) => item.id.toString()}
+              ListEmptyComponent={<Text>Nenhuma academia disponível.</Text>}
               renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalOption}
-                  onPress={() => {
-                    setSelectedGym(item.name);
-                    setGymModalVisible(false);
-                  }}
-                >
+                <TouchableOpacity style={styles.modalOption} onPress={() => handleSelectGym(item)}>
                   <Text style={styles.modalOptionText}>{item.name}</Text>
                 </TouchableOpacity>
               )}
             />
+            <TouchableOpacity style={styles.closeButton} onPress={() => setGymModalVisible(false)}>
+              <Text style={styles.buttonText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <PersonalizarTreinoModal
+        isVisible={isWorkoutModalVisible}
+        onClose={() => setWorkoutModalVisible(false)}
+        dayLabel={todayLabel}
+        initialWorkout={todayWorkout}
+        onSave={handleSaveWorkout}
+      />
+
+      <Modal
+        visible={isOtherWorkoutsModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setOtherWorkoutsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Outros Treinos</Text>
+            <FlatList
+              data={sortedWorkouts}
+              renderItem={renderWorkoutItem}
+              keyExtractor={(item) => item.id.toString()}
+              ListEmptyComponent={<Text>Nenhum treino cadastrado.</Text>}
+              style={styles.workoutList}
+            />
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setGymModalVisible(false)}
+              onPress={() => setOtherWorkoutsModalVisible(false)}
             >
               <Text style={styles.buttonText}>Fechar</Text>
             </TouchableOpacity>
@@ -198,81 +284,11 @@ const DashboardAluno = () => {
         </View>
       </Modal>
 
-      {/* Modal para Personalizar Treino */}
-      <PersonalizarTreinoModal
-        isVisible={isWorkoutModalVisible}
-        onClose={() => setWorkoutModalVisible(false)}
-        dayName={dayName}
-        initialWorkout={todayWorkout}
-        onSave={(updatedWorkout) => {
-          setTodayWorkout(updatedWorkout);
-          setWorkoutModalVisible(false);
-        }}
+      <TreineSeuJeitoModal
+        visible={isTreineSeuJeitoModalVisible}
+        onClose={() => setTreineSeuJeitoModalVisible(false)}
+        onSubmit={handleCustomWorkout}
       />
-         <Modal
-              visible={isOtherWorkoutsModalVisible}
-              transparent
-              animationType="slide"
-              onRequestClose={() => setOtherWorkoutsModalVisible(false)}
-            >
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContainer}>
-                  <Text style={styles.modalTitle}>Outros Treinos</Text>
-                  <FlatList
-                    data={Object.entries(workouts)}
-                    renderItem={renderWorkoutItem}
-                    keyExtractor={(item) => item[0]}
-                    style={styles.workoutList}
-                  />
-                  <TouchableOpacity
-                    style={styles.closeButton}
-                    onPress={() => setOtherWorkoutsModalVisible(false)}
-                  >
-                    <Text style={styles.buttonText}>Fechar</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Modal>
-
-<TreineSeuJeitoModal
-  visible={isTreineSeuJeitoModalVisible}
-  onClose={() => setTreineSeuJeitoModalVisible(false)}
-  onSubmit={async (data) => {
-    try {
-      const { text, image } = data;
-
-      // Diretório local do aplicativo
-      const directoryPath = `${FileSystem.documentDirectory}TreineSeuJeito/`;
-
-      // Certifique-se de que o diretório existe
-      const dirInfo = await FileSystem.getInfoAsync(directoryPath);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(directoryPath, { intermediates: true });
-      }
-
-      // Salvar o texto em um arquivo
-      const textFilePath = `${directoryPath}texto.txt`;
-      await FileSystem.writeAsStringAsync(textFilePath, text);
-
-      // Fazer o download da imagem (se existir) e copiá-la para o diretório
-      if (image) {
-        const imageFileName = image.split('/').pop(); // Extrair o nome da imagem
-        const imageFilePath = `${directoryPath}${imageFileName}`;
-        await FileSystem.copyAsync({
-          from: image,
-          to: imageFilePath,
-        });
-      }
-
-      Alert.alert("Sucesso", "Texto e imagem armazenados localmente!");
-      setTreineSeuJeitoModalVisible(false);
-    } catch (error) {
-      console.error("Erro ao salvar dados:", error);
-      Alert.alert("Erro", "Ocorreu um problema ao salvar os dados.");
-    }
-  }}
-/>;
-
     </View>
   );
 };
@@ -283,6 +299,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#000011",
     padding: 20,
     paddingTop: 100,
+  },
+  center: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  greeting: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "white",
   },
   date: {
     fontSize: 18,
@@ -355,6 +386,26 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginTop: 20,
     alignItems: "center",
+  },
+  workoutList: {
+    maxHeight: 400,
+  },
+  workoutItem: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+  },
+  workoutDay: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  workoutName: {
+    fontSize: 15,
+    marginBottom: 4,
+  },
+  workoutExercise: {
+    fontSize: 14,
+    color: "#555",
   },
 });
 

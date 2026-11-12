@@ -4,14 +4,19 @@ import { Picker } from '@react-native-picker/picker';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { createUser } from '@/services/userService';
+import { useRouter } from 'expo-router';
+import { register } from '@/services/authService';
+import { getErrorMessage } from '@/services/api';
+import { Sex, UserType } from '@/services/types';
 
 export default function UserRegistration() {
+  const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [sex, setSex] = useState('Masculino');
-  const [userType, setUserType] = useState('aluno');
+  const [sex, setSex] = useState<Sex>('male');
+  const [userType, setUserType] = useState<UserType>('student');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
     if (!name || !email || !password) {
@@ -19,22 +24,24 @@ export default function UserRegistration() {
       return;
     }
 
-
+    setLoading(true);
     try {
-      const newUser = await createUser({
-        name,
-        email,
+      await register({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
         password,
         sex,
         user_type: userType,
-        gym_ids: []
       });
-      console.log('Usuário cadastrado:', newUser);
-      Alert.alert('Sucesso', 'Cadastro realizado com sucesso!');
-      // Aqui você pode navegar para a tela de login ou dashboard
+      setName('');
+      setEmail('');
+      setPassword('');
+      Alert.alert('Sucesso', 'Cadastro realizado! Faça login para continuar.');
+      router.replace('/');
     } catch (error) {
-      console.error('Erro ao cadastrar usuário:', error);
-      Alert.alert('Erro', error.message || 'Não foi possível realizar o cadastro. Tente novamente.');
+      Alert.alert('Erro', getErrorMessage(error, 'Não foi possível realizar o cadastro. Tente novamente.'));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -70,6 +77,7 @@ export default function UserRegistration() {
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
+            autoCapitalize="none"
           />
 
           <TextInput
@@ -88,8 +96,8 @@ export default function UserRegistration() {
               style={styles.picker}
               onValueChange={(itemValue) => setSex(itemValue)}
             >
-              <Picker.Item label="Masculino" value="Masculino" />
-              <Picker.Item label="Feminino" value="Feminino" />
+              <Picker.Item label="Masculino" value="male" />
+              <Picker.Item label="Feminino" value="female" />
             </Picker>
           </View>
 
@@ -100,12 +108,12 @@ export default function UserRegistration() {
               style={styles.picker}
               onValueChange={(itemValue) => setUserType(itemValue)}
             >
-              <Picker.Item label="Aluno" value="aluno" />
-              <Picker.Item label="Instrutor" value="instrutor" />
+              <Picker.Item label="Aluno" value="student" />
+              <Picker.Item label="Instrutor" value="instructor" />
             </Picker>
           </View>
 
-          <Button title="Cadastrar" onPress={handleSubmit} />
+          <Button title={loading ? 'Cadastrando...' : 'Cadastrar'} onPress={handleSubmit} disabled={loading} />
         </ScrollView>
       </ParallaxScrollView>
     </KeyboardAvoidingView>

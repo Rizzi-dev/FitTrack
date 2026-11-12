@@ -10,105 +10,96 @@ import {
   Alert,
 } from "react-native";
 
-interface Exercicio {
-  maquina: string;
-  series: string;
-}
-
-interface Workout {
-  treino: string;
-  exercicios: Exercicio[];
-}
+import { Exercise, WorkoutPayload } from "@/services/types";
 
 interface PersonalizarTreinoModalProps {
   isVisible: boolean;
   onClose: () => void;
-  dayName: string;
-  initialWorkout: Workout | null;
-  onSave: (updatedWorkout: Workout) => void;
+  dayLabel: string;
+  initialWorkout: WorkoutPayload | null;
+  onSave: (updatedWorkout: WorkoutPayload) => Promise<void>;
 }
+
+const EMPTY_WORKOUT: WorkoutPayload = { name: "", exercises: [] };
 
 const PersonalizarTreinoModal: React.FC<PersonalizarTreinoModalProps> = ({
   isVisible,
   onClose,
-  dayName,
+  dayLabel,
   initialWorkout,
   onSave,
 }) => {
-  const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
+  const [editingWorkout, setEditingWorkout] = useState<WorkoutPayload>(EMPTY_WORKOUT);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setEditingWorkout(initialWorkout);
-  }, [initialWorkout]);
+    if (isVisible) {
+      setEditingWorkout(
+        initialWorkout
+          ? { name: initialWorkout.name, exercises: initialWorkout.exercises.map((e) => ({ ...e })) }
+          : EMPTY_WORKOUT
+      );
+    }
+  }, [initialWorkout, isVisible]);
 
   const addExercise = () => {
-    if (editingWorkout) {
-      const updatedWorkout = {
-        ...editingWorkout,
-        exercicios: [...editingWorkout.exercicios, { maquina: "", series: "" }],
-      };
-      setEditingWorkout(updatedWorkout);
-    }
+    setEditingWorkout((w) => ({ ...w, exercises: [...w.exercises, { machine: "", sets: "" }] }));
   };
 
   const removeExercise = (index: number) => {
-    if (editingWorkout) {
-      const updatedWorkout = {
-        ...editingWorkout,
-        exercicios: editingWorkout.exercicios.filter((_, i) => i !== index),
-      };
-      setEditingWorkout(updatedWorkout);
-    }
+    setEditingWorkout((w) => ({ ...w, exercises: w.exercises.filter((_, i) => i !== index) }));
   };
 
-  const saveWorkout = () => {
-    if (editingWorkout) {
-      onSave(editingWorkout);
-      Alert.alert("Sucesso", "Treino atualizado com sucesso!");
-    }
+  const updateExercise = (index: number, field: keyof Exercise, value: string) => {
+    setEditingWorkout((w) => ({
+      ...w,
+      exercises: w.exercises.map((e, i) => (i === index ? { ...e, [field]: value } : e)),
+    }));
   };
 
-  if (!editingWorkout) {
-    return null; // Evitar erros durante o carregamento
-  }
+  const saveWorkout = async () => {
+    if (!editingWorkout.name.trim()) {
+      Alert.alert("Erro", "Informe o nome do treino.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave({
+        name: editingWorkout.name.trim(),
+        exercises: editingWorkout.exercises.filter((e) => e.machine.trim()),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <Modal visible={isVisible} transparent animationType="slide">
+    <Modal visible={isVisible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalContainer}>
         <ScrollView style={styles.modalContent}>
           <Text style={styles.modalTitle}>Personalize seu Treino</Text>
-          <Text style={styles.subtitle}>Hoje: {dayName}</Text>
+          <Text style={styles.subtitle}>Hoje: {dayLabel}</Text>
 
           <TextInput
             style={styles.input}
-            value={editingWorkout.treino}
-            onChangeText={(text) =>
-              setEditingWorkout({ ...editingWorkout, treino: text })
-            }
+            value={editingWorkout.name}
+            onChangeText={(text) => setEditingWorkout((w) => ({ ...w, name: text }))}
             placeholder="Nome do Treino"
           />
 
-          {editingWorkout.exercicios.map((exercicio, index) => (
+          {editingWorkout.exercises.map((exercise, index) => (
             <View key={index} style={styles.exercicioContainer}>
               <TextInput
                 style={styles.input}
-                value={exercicio.maquina}
-                onChangeText={(text) => {
-                  const updatedExercicios = [...editingWorkout.exercicios];
-                  updatedExercicios[index].maquina = text;
-                  setEditingWorkout({ ...editingWorkout, exercicios: updatedExercicios });
-                }}
+                value={exercise.machine}
+                onChangeText={(text) => updateExercise(index, "machine", text)}
                 placeholder="Nome do Exercício"
               />
 
               <TextInput
                 style={styles.input}
-                value={exercicio.series}
-                onChangeText={(text) => {
-                  const updatedExercicios = [...editingWorkout.exercicios];
-                  updatedExercicios[index].series = text;
-                  setEditingWorkout({ ...editingWorkout, exercicios: updatedExercicios });
-                }}
+                value={exercise.sets}
+                onChangeText={(text) => updateExercise(index, "sets", text)}
                 placeholder="Séries (ex: 4x10)"
               />
 
@@ -125,8 +116,8 @@ const PersonalizarTreinoModal: React.FC<PersonalizarTreinoModalProps> = ({
             <Text style={styles.buttonText}>Adicionar Exercício</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.saveButton} onPress={saveWorkout}>
-            <Text style={styles.buttonText}>Salvar</Text>
+          <TouchableOpacity style={styles.saveButton} onPress={saveWorkout} disabled={saving}>
+            <Text style={styles.buttonText}>{saving ? "Salvando..." : "Salvar"}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
